@@ -361,13 +361,33 @@ int main(int argc, char *argv[]) { /*****************MAIN*********************/
     }
   }// end info
   else if (app_state == app_state_cmd) {
-    //TODO: Send command here
-    printf("send cmd and receive response. CMD: ");
+    //TODO: Send custom/proprietary command here
+    printf("Send proprietary cmd and receive response. CMD: ");
     for (i=0;i<cmd_len;i++) {
-      printf("%x ", cmd_data[i]);
+      printf("0x%02x ", cmd_data[i]);
     }
     printf("\r\n");
-  }
+    printf("Querying SerialAPI device on %s...\r\n", portstring);
+    retry_cnt = 0;
+    do  {
+      ack=SendSerial(cmd_data,cmd_len);
+      #ifdef DEBUG
+      if (ack == NAK) {
+          printf("NAK received - retry #%d\r\n", retry_cnt);
+      }
+      #endif
+    } while (ack == NAK && retry_cnt++ < RETRY_CNT);
 
+    if (ack!=ACK) {
+        printf("Unable to send custom SerialAPI command " \
+        " (%s)\r\n",statusString(ack));
+    } else {
+      len=GetSerial(readBuf);
+      for (i=1;i<len;i++) {
+          printf("0x%02x ", readBuf[i]);   
+      }
+      printf("\r\n");
+    }
+  }
     close(serial);
 }   /* Main */
