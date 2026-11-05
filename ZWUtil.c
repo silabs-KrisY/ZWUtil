@@ -15,6 +15,7 @@
 #include <errno.h>
 #include <getopt.h>
 #include "ZWave.h"
+#include <stdint.h>
 
 // RX/TX UART buffer size. Most Z-Wave frames are under 64 bytes.
 #define BUF_SIZE 128
@@ -59,7 +60,7 @@ static enum app_states {
 } app_state = app_state_info;
 
 #define MAX_CMD_STRING_LEN  16u
-uint8_t cmd_data[MAX_CMD_STRING_LEN/2]; //half of string length due to ascii hex data in string
+char cmd_data[MAX_CMD_STRING_LEN/2]; //half of string length due to ascii hex data in string
 uint8_t cmd_len; //how many bytes in cmd_data
 
 void usage(char* appname) {
@@ -136,7 +137,7 @@ int GetSerial(char *pkt) { /* Get SerialAPI frame from UART. Returns the length 
     return(len-2);      // remove LEN and TYPE
 } /* GetSerial */
 
-int SendSerial(const char *pkt,int len) { /* send SerialAPI command PKT of length LEN after encapsulating */
+int SendSerial(char *pkt,int len) { /* send SerialAPI command PKT of length LEN after encapsulating */
     /* Returns ACK/NAK/CAN if the packet was delivered to the serial, -1 if no response */
     /* if not ACKed, will try a total of 3 times */
     /* SerialAPI format:
@@ -148,7 +149,9 @@ int SendSerial(const char *pkt,int len) { /* send SerialAPI command PKT of lengt
      * CHECKSUM = XOR of all bytes except SOF. Should be 0 if checksum is OK. NAK is sent if checksum fails.
      */
     char buf[BUF_SIZE];
+#ifdef DEBUG
     int i;
+#endif
     int retry;
     int ack=ACK;
     int sendStatus;
@@ -171,10 +174,17 @@ int SendSerial(const char *pkt,int len) { /* send SerialAPI command PKT of lengt
         usleep(10000); // wait 10ms then read the ACK
         sendStatus = read(serial,readBuf,1);          // Get the ACK/NAK/CAN
         if (sendStatus==1) {
-            if (readBuf[0]==ACK) break; // Got the ACK so break
+            if (readBuf[0]==ACK) {
+              #ifdef DEBUG
+              printf("ACK recieved!\r\n");
+              #endif
+              break;} // Got the ACK so break
             write(serial,&ack,1);          // Got something else so try sending an ACK to clear
         }
         sleep(2);      // wait a bit and try again
+#ifdef DEBUG
+        printf("No ACK received, retrying\r\n");
+#endif
     }
     if (sendStatus!=1) {
         printf("UART Timeout\r\n");
@@ -362,7 +372,7 @@ int main(int argc, char *argv[]) { /*****************MAIN*********************/
   }// end info
   else if (app_state == app_state_cmd) {
     //TODO: Send custom/proprietary command here
-    printf("Send proprietary cmd and receive response. CMD: ");
+    printf("Send cmd and receive response. CMD: ");
     for (i=0;i<cmd_len;i++) {
       printf("0x%02x ", cmd_data[i]);
     }
